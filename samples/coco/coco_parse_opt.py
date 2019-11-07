@@ -48,7 +48,7 @@ import urllib.request
 import shutil
 
 # Root directory of the project
-ROOT_DIR = os.path.abspath("../../")
+ROOT_DIR = os.path.abspath("/home/user/Work/Mask_RCNN/samples/coco/")
 
 # Import Mask RCNN
 sys.path.append(ROOT_DIR)  # To find local version of the library
@@ -78,14 +78,15 @@ class CocoConfig(Config):
 
     # We use a GPU with 12GB memory, which can fit two images.
     # Adjust down if you use a smaller GPU.
-    IMAGES_PER_GPU = 2
+    IMAGES_PER_GPU = 1
 
     # Uncomment to train on 8 GPUs (default is 1)
-    # GPU_COUNT = 8
+    GPU_COUNT = 2
 
     # Number of classes (including background)
     NUM_CLASSES = 1 + 5 #80  # COCO has 80 classes
 
+imgdir = "/home/user/Dataset/Jeju/annotated"
 
 ############################################################
 #  Dataset
@@ -108,10 +109,11 @@ class CocoDataset(utils.Dataset):
         if auto_download is True:
             self.auto_download(dataset_dir, subset, year)
 
-        coco = COCO("{}/annotations/instances_{}{}.json".format(dataset_dir, subset, year))
-        if subset == "minival" or subset == "valminusminival":
+        coco = COCO("{}/instances_{}{}.json".format(dataset_dir, subset, year))
+        if subset == "minival" or subset == "valminusminival" :
             subset = "val"
-        image_dir = "{}/{}{}".format(dataset_dir, subset, year)
+        #image_dir = "{}/{}{}".format(dataset_dir, subset, year)
+        image_dir = imgdir #"{}{}".format(subset, year)
 
         # Load all classes or a subset?
         if not class_ids:
@@ -397,96 +399,100 @@ def evaluate_coco(model, dataset, coco, eval_type="bbox", limit=0, image_ids=Non
 
 
 if __name__ == '__main__':
-    import argparse
-
+    #import argparse
+    from optparse import OptionParser
     # Parse command line arguments
-    parser = argparse.ArgumentParser(
+    print(os.getcwd())
+    parser = OptionParser(
         description='Train Mask R-CNN on MS COCO.')
-    parser.add_argument("command",
-                        metavar="<command>",
-                        help="'train' or 'evaluate' on MS COCO")
-    parser.add_argument('--dataset', required=True,
+    parser.add_option("--command",
+                        metavar="command",
+                        help="'train' or 'evaluate' on MS COCO", default='train')
+    parser.add_option('--dataset',
                         metavar="/path/to/coco/",
-                        help='Directory of the MS-COCO dataset')
-    parser.add_argument('--year', required=False,
+                        help='Directory of the MS-COCO dataset', default= "/home/user/Dataset/Jeju")
+    parser.add_option('--year',
                         default=DEFAULT_DATASET_YEAR,
                         metavar="<year>",
                         help='Year of the MS-COCO dataset (2014 or 2017) (default=2014)')
-    parser.add_argument('--model', required=True,
+    parser.add_option('--model',
                         metavar="/path/to/weights.h5",
-                        help="Path to weights .h5 file or 'coco'")
-    parser.add_argument('--logs', required=False,
+                        help="Path to weights .h5 file or 'coco'", default = 'last')
+    parser.add_option('--logs',
                         default=DEFAULT_LOGS_DIR,
                         metavar="/path/to/logs/",
                         help='Logs and checkpoints directory (default=logs/)')
-    parser.add_argument('--limit', required=Fals
+    parser.add_option('--limit',
                         default=500,
                         metavar="<image count>",
                         help='Images to use for evaluation (default=500)')
-    parser.add_argument('--download', required=False,
+    parser.add_option('--download',
                         default=False,
                         metavar="<True|False>",
-                        help='Automatically download and unzip MS-COCO files (default=False)',
-                        type=bool)
-    args = parser.parse_args()
-    print("Command: ", args.command)
-    print("Model: ", args.model)
-    print("Dataset: ", args.dataset)
-    print("Year: ", args.year)
-    print("Logs: ", args.logs)
-    print("Auto Download: ", args.download)
+                        help='Automatically download and unzip MS-COCO files (default=False)')
+
+    (options, args) = parser.parse_args()
+
+    print("Command: ", options.command)
+    print("Model: ", options.model)
+    print("Dataset: ", options.dataset)
+    print("Year: ", options.year)
+    print("Logs: ", options.logs)
+    print("Auto Download: ", options.download)
 
     # Configurations
-    if args.command == "train":
+    if options.command == "train":
         config = CocoConfig()
+        test = 1
     else:
         class InferenceConfig(CocoConfig):
             # Set batch size to 1 since we'll be running inference on
             # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
-            GPU_COUNT = 3
+            GPU_COUNT = 2
             IMAGES_PER_GPU = 1
             DETECTION_MIN_CONFIDENCE = 0
         config = InferenceConfig()
     config.display()
 
     # Create model
-    if args.command == "train":
+    if options.command == "train":
         model = modellib.MaskRCNN(mode="training", config=config,
-                                  model_dir=args.logs)
+                                  model_dir=options.logs)
     else:
         model = modellib.MaskRCNN(mode="inference", config=config,
-                                  model_dir=args.logs)
+                                  model_dir=options.logs)
 
     # Select weights file to load
-    if args.model.lower() == "coco":
+    if options.model.lower() == "coco":
         model_path = COCO_MODEL_PATH
-    elif args.model.lower() == "last":
+    elif options.model.lower() == "last":
         # Find last trained weights
         model_path = model.find_last()
-    elif args.model.lower() == "imagenet":
+    elif options.model.lower() == "imagenet":
         # Start from ImageNet trained weights
         model_path = model.get_imagenet_weights()
     else:
-        model_path = args.model
+        model_path = options.model
 
     # Load weights
     print("Loading weights ", model_path)
     model.load_weights(model_path, by_name=True)
 
     # Train or evaluate
-    if args.command == "train":
+    if options.command == "train":
         # Training dataset. Use the training set and 35K from the
         # validation set, as as in the Mask RCNN paper.
         dataset_train = CocoDataset()
-        dataset_train.load_coco(args.dataset, "train", year=args.year, auto_download=args.download)
-        if args.year in '2014':
-            dataset_train.load_coco(args.dataset, "valminusminival", year=args.year, auto_download=args.download)
+        dataset_train.load_coco(options.dataset, "train", year=options.year, auto_download=options.download)
+        if options.year in '2014':
+            # dataset_train.load_coco(options.dataset, "valminusminival", year=options.year, auto_download=options.download)
+            dataset_train.load_coco(options.dataset, "train", year=options.year, auto_download=options.download)
         dataset_train.prepare()
 
         # Validation dataset
         dataset_val = CocoDataset()
-        val_type = "val" if args.year in '2017' else "minival"
-        dataset_val.load_coco(args.dataset, val_type, year=args.year, auto_download=args.download)
+        val_type = "val" #if options.year in '2017' else "minival"
+        dataset_val.load_coco(options.dataset, val_type, year=options.year, auto_download=options.download)
         dataset_val.prepare()
 
         # Image Augmentation
@@ -521,14 +527,15 @@ if __name__ == '__main__':
                     layers='all',
                     augmentation=augmentation)
 
-    elif args.command == "evaluate":
+    elif options.command == "evaluate":
         # Validation dataset
         dataset_val = CocoDataset()
-        val_type = "val" if args.year in '2017' else "minival"
-        coco = dataset_val.load_coco(args.dataset, val_type, year=args.year, return_coco=True, auto_download=args.download)
+        # val_type = "val" if options.year in '2017' else "minival"
+        val_type = "val" if options.year in '2014' else "minival"
+        coco = dataset_val.load_coco(options.dataset, val_type, year=options.year, return_coco=True, auto_download=options.download)
         dataset_val.prepare()
-        print("Running COCO evaluation on {} images.".format(args.limit))
-        evaluate_coco(model, dataset_val, coco, "bbox", limit=int(args.limit))
+        print("Running COCO evaluation on {} images.".format(options.limit))
+        evaluate_coco(model, dataset_val, coco, "bbox", limit=int(options.limit))
     else:
         print("'{}' is not recognized. "
-              "Use 'train' or 'evaluate'".format(args.command))
+              "Use 'train' or 'evaluate'".format(options.command))
