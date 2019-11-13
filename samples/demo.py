@@ -17,43 +17,98 @@ import random
 import math
 import numpy as np
 import skimage.io
+from skimage.transform import rotate
 import matplotlib
 matplotlib.use('tkagg')
 import matplotlib.pyplot as plt
-os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+
 # Root directory of the project
 ROOT_DIR = os.path.abspath("../")
-
+import cv2
 # Import Mask RCNN
 sys.path.append(ROOT_DIR)  # To find local version of the library
 from mrcnn import utils
 import mrcnn.model as modellib
 from mrcnn import visualize
-# env["MPLBACKEND"]="tkagg"
-
-
-
 # Import COCO config
 sys.path.append(os.path.join(ROOT_DIR, "samples/coco/"))  # To find local version
 # import coco
 from samples.coco import coco_parse_opt as coco
 #%matplotlib inline
+import cv2
+from PIL import Image
+from PIL.ExifTags import TAGS, GPSTAGS
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+
+def getExif(path):
+    src_image = Image.open(path)
+    info = src_image._getexif()
+
+    # Focal Length
+    focalLength = info[37386]
+    focal_length = focalLength[0] / focalLength[1] # unit: mm
+    focal_length = focal_length * pow(10, -3) # unit: m
+
+    # Orientation
+    orientation = info[274]
+
+    return focal_length, orientation
+
+def restoreOrientation(image, orientation):
+    if orientation == 8:
+        restored_image = rotate(image, -90)
+    elif orientation == 6:
+        restored_image = rotate(image, 90)
+    elif orientation == 3:
+        restored_image = rotate(image, 180)
+    else:
+        restored_image = image
+
+    return restored_image
+
+def rotate(image, angle):
+    # https://www.pyimagesearch.com/2017/01/02/rotate-images-correctly-with-opencv-and-python/
+
+    height = image.shape[0]
+    width = image.shape[1]
+    center = (width/2, height/2)
+
+    # grab the rotation matrix (applying the negative of the
+    # angle to rotate clockwise), then grab the sine and cosine
+    # (i.e., the rotation components of the matrix)
+    rotation_mat = cv2.getRotationMatrix2D(center, angle, 1.0)
+    abs_cos = abs(rotation_mat[0, 0])
+    abs_sin = abs(rotation_mat[0, 1])
+
+    # compute the new bounding dimensions of the image
+    bound_w = int(height * abs_sin + width * abs_cos)
+    bound_h = int(height * abs_cos + width * abs_sin)
+
+    # adjust the rotation matrix to take into account translation
+    rotation_mat[0, 2] += bound_w / 2 - center[0]
+    rotation_mat[1, 2] += bound_h / 2 - center[1]
+
+    # perform the actual rotation and return the image
+    rotated_mat = cv2.warpAffine(image, rotation_mat, (bound_w, bound_h))
+    return rotated_mat
 
 # Directory to save logs and trained model
-# MODEL_DIR = os.path.join(ROOT_DIR, "logs")
-MODEL_DIR = "/home/user/Work/Mask_RCNN/samples/coco/logs" #os.path.join(ROOT_DIR, "logs")
-test = 1
+MODEL_DIR = "/home/user/Work/Mask_RCNN/samples/coco/logs"#os.path.join(ROOT_DIR, "logs")
+
+# MODEL_DIR = "/home/user/logs" #os.path.join(ROOT_DIR, "logs")
 # Local path to trained weights file
-# COCO_MODEL_PATH = os.path.join(ROOT_DIR, "mask_rcnn_coco.h5") #Checkpoint Path: /home/user/Work/Mask_RCNN/samples/coco/logs/coco20191105T1724/mask_rcnn_coco_{epoch:04d}.h5
-# COCO_MODEL_PATH ="/home/user/Work/Mask_RCNN/samples/coco/logs/coco20191105T1802/mask_rcnn_coco_0124.h5" #Checkpoint Path: /home/user/Work/Mask_RCNN/samples/coco/logs/coco20191105T1724/mask_rcnn_coco_{epoch:04d}.h5
-COCO_MODEL_PATH ="/home/user/Work/Mask_RCNN/samples/coco/logs/coco20191105T1802/mask_rcnn_coco_0159.h5" #Checkpoint Path: /home/user/Work/Mask_RCNN/samples/coco/logs/coco20191105T1724/mask_rcnn_coco_{epoch:04d}.h5
+# COCO_MODEL_PATH ="/home/user/Work/Mask_RCNN/samples/coco/logs/coco20191111T1858/mask_rcnn_coco_0078.h5" #ok
+# COCO_MODEL_PATH ="/home/user/Work/Mask_RCNN/samples/coco/logs/coco20191111T1858/mask_rcnn_coco_0083.h5"
+# #Checkpoint Path: /home/user/Work/Mask_RCNN/samples/coco/logs/coco20191105T1724/mask_rcnn_coco_{epoch:04d}.h5
+print(MODEL_DIR)
 # Download COCO trained weights from Releases if needed
-if not os.path.exists(COCO_MODEL_PATH):
-    utils.download_trained_weights(COCO_MODEL_PATH)
+# if not os.path.exists(COCO_MODEL_PATH):
+#     utils.download_trained_weights(COCO_MODEL_PATH)
 
 # Directory of images to run detection on
 # IMAGE_DIR = os.path.join(ROOT_DIR, "images")
-IMAGE_DIR = "/home/user/Dataset/Jeju/annotated"#os.path.join(ROOT_DIR, "images")
+IMAGE_DIR = "/home/user/Dataset/Jeju/annotated/"#os.path.join(ROOT_DIR, "images")
+# IMAGE_DIR = "/home/user/crop"#os.path.join(ROOT_DIR, "images")
 
 """## Configurations
 
@@ -75,7 +130,7 @@ config.display()
 
 # Create model object in inference mode.
 model = modellib.MaskRCNN(mode="inference", model_dir=MODEL_DIR, config=config)
-
+COCO_MODEL_PATH =model.find_last()
 # Load weights trained on MS-COCO
 model.load_weights(COCO_MODEL_PATH, by_name=True)
 
@@ -124,14 +179,28 @@ class_names = ["0","1","2","3","4","5"]
 # Load a random image from the images folder
 for i in range(10):
     file_names = next(os.walk(IMAGE_DIR))[2]
-    image = skimage.io.imread(os.path.join(IMAGE_DIR, random.choice(file_names)))
+    # image = skimage.io.imread(os.path.join(IMAGE_DIR, random.choice(file_names)))
+    img_cv = cv2.imread(os.path.join(IMAGE_DIR,file_names[i]))
+    # image = rotate(image,90)
+    _,orientation = getExif(IMAGE_DIR+file_names[i])
+    image = restoreOrientation(img_cv,orientation)
+    image = image[:,:,::-1]
     test = 1
     # Run detection
-    results = model.detect([image], verbose=1)
+    results = model.detect([image],verbose=1)
 
     # Visualize results
     r = results[0]
     visualize.display_instances(image, r['rois'], r['masks'], r['class_ids'],
                                 class_names, r['scores'])
     # fig.savefig('demo.png', bbox_inches='tight')
+
+        # test = 1
+
+
+# img_sk = skimage.io.imread(os.path.join(IMAGE_DIR,"20191010_104328.JPG"))
+
+
+test = 1
+
 

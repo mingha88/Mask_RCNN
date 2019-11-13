@@ -23,6 +23,8 @@ import shutil
 import warnings
 from distutils.version import LooseVersion
 
+import cv2
+import mrcnn.ImgPreprocess as IP
 # URL from which to download the latest COCO trained weights
 COCO_MODEL_URL = "https://github.com/matterport/Mask_RCNN/releases/download/v2.0/mask_rcnn_coco.h5"
 
@@ -106,8 +108,9 @@ def compute_overlaps_masks(masks1, masks2):
     if masks1.shape[-1] == 0 or masks2.shape[-1] == 0:
         return np.zeros((masks1.shape[-1], masks2.shape[-1]))
     # flatten masks and compute their areas
-    masks1 = np.reshape(masks1 > .5, (-1, masks1.shape[-1])).astype(np.float32)
-    masks2 = np.reshape(masks2 > .5, (-1, masks2.shape[-1])).astype(np.float32)
+    # masks1 = np.reshape(masks1 > .5, (-1, masks1.shape[-1])).astype(np.float32)
+    # masks2 = np.reshape(masks2 > .5, (-1, masks2.shape[-1])).astype(np.float32
+    # masks1 = np.reshape(masks1 > .5, (-1, masks1.shape[-1])).astype(np.float32)
     area1 = np.sum(masks1, axis=0)
     area2 = np.sum(masks2, axis=0)
 
@@ -355,8 +358,14 @@ class Dataset(object):
     def load_image(self, image_id):
         """Load the specified image and return a [H,W,3] Numpy array.
         """
+        img_cv = cv2.imread(self.image_info[image_id]['path'])
+        _, orientation = IP.getExif(self.image_info[image_id]['path'])
+        image = IP.restoreOrientation(img_cv, orientation)
+        image = image[:, :, ::-1] # convert cv2 image to skimage
+
         # Load image
-        image = skimage.io.imread(self.image_info[image_id]['path'])
+        # image = skimage.io.imread(self.image_info[image_id]['path'])
+
         # If grayscale. Convert to RGB for consistency.
         if image.ndim != 3:
             image = skimage.color.gray2rgb(image)
@@ -421,6 +430,7 @@ def resize_image(image, min_dim=None, max_dim=None, min_scale=None, mode="square
     image_dtype = image.dtype
     # Default window (y1, x1, y2, x2) and default scale == 1.
     h, w = image.shape[:2]
+    #print("height,width",h,w)
     window = (0, 0, h, w)
     scale = 1
     padding = [(0, 0), (0, 0), (0, 0)]

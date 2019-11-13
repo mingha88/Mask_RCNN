@@ -62,7 +62,7 @@ COCO_MODEL_PATH = os.path.join(ROOT_DIR, "mask_rcnn_coco.h5")
 # through the command line argument --logs
 DEFAULT_LOGS_DIR = os.path.join(ROOT_DIR, "logs")
 DEFAULT_DATASET_YEAR = "2014"
-
+# os.environ["CUDA_VISIBLE_DEVICES"] = "1,2"
 ############################################################
 #  Configurations
 ############################################################
@@ -81,7 +81,7 @@ class CocoConfig(Config):
     IMAGES_PER_GPU = 1
 
     # Uncomment to train on 8 GPUs (default is 1)
-    GPU_COUNT = 2
+    GPU_COUNT = 1
 
     # Number of classes (including background)
     NUM_CLASSES = 1 + 5 #80  # COCO has 80 classes
@@ -448,7 +448,7 @@ if __name__ == '__main__':
         class InferenceConfig(CocoConfig):
             # Set batch size to 1 since we'll be running inference on
             # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
-            GPU_COUNT = 2
+            GPU_COUNT = 1
             IMAGES_PER_GPU = 1
             DETECTION_MIN_CONFIDENCE = 0
         config = InferenceConfig()
@@ -500,7 +500,7 @@ if __name__ == '__main__':
         augmentation = imgaug.augmenters.Fliplr(0.5)
 
         # *** This training schedule is an example. Update to your needs ***
-
+        mean_average_precision_callback = modellib.MeanAveragePrecisionCallback(model,model,dataset_val,calculate_map_at_every_X_epoch=1,verbose=1)
         # Training - Stage 1
         print("Training network heads")
         model.train(dataset_train, dataset_val,
@@ -525,7 +525,8 @@ if __name__ == '__main__':
                     learning_rate=config.LEARNING_RATE / 10,
                     epochs=160,
                     layers='all',
-                    augmentation=augmentation)
+                    augmentation=augmentation,
+                    custom_callbacks=[mean_average_precision_callback])
 
     elif options.command == "evaluate":
         # Validation dataset
