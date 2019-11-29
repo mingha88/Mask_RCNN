@@ -48,7 +48,7 @@ import urllib.request
 import shutil
 
 # Root directory of the project
-ROOT_DIR = os.path.abspath("../../")
+ROOT_DIR = os.path.abspath("/home/user/Work/Mask_RCNN/samples/coco/")
 
 # Import Mask RCNN
 sys.path.append(ROOT_DIR)  # To find local version of the library
@@ -62,7 +62,7 @@ COCO_MODEL_PATH = os.path.join(ROOT_DIR, "mask_rcnn_coco.h5")
 # through the command line argument --logs
 DEFAULT_LOGS_DIR = os.path.join(ROOT_DIR, "logs")
 DEFAULT_DATASET_YEAR = "2014"
-
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 ############################################################
 #  Configurations
 ############################################################
@@ -78,15 +78,17 @@ class CocoConfig(Config):
 
     # We use a GPU with 12GB memory, which can fit two images.
     # Adjust down if you use a smaller GPU.
-    IMAGES_PER_GPU = 2
+    IMAGES_PER_GPU = 1
 
     # Uncomment to train on 8 GPUs (default is 1)
-    # GPU_COUNT = 8
+    GPU_COUNT = 1
 
     # Number of classes (including background)
-    NUM_CLASSES = 1 + 80  # COCO has 80 classes
+    # NUM_CLASSES = 12 #Visdrone (1+11)
+    NUM_CLASSES = 1 + 5 #80  # COCO has 80 classes
 
-    
+imgdir = "/home/user/Dataset/Jeju/fortraining_update"
+# imgdir = "/home/user/Dataset/Jeju/1_kau_1010/annotated"
 
 ############################################################
 #  Dataset
@@ -109,11 +111,11 @@ class CocoDataset(utils.Dataset):
         if auto_download is True:
             self.auto_download(dataset_dir, subset, year)
 
-        coco = COCO("{}/COCO2014_annotations/instances_{}{}.json".format(dataset_dir, subset, year))
+        coco = COCO("{}/instances_{}{}.json".format(dataset_dir, subset, year))
         if subset == "minival" or subset == "valminusminival" :
             subset = "val"
         #image_dir = "{}/{}{}".format(dataset_dir, subset, year)
-        image_dir = "{}{}".format(subset, year)
+        image_dir = imgdir #"{}{}".format(subset, year)
 
         # Load all classes or a subset?
         if not class_ids:
@@ -410,20 +412,20 @@ if __name__ == '__main__':
                         help="'train' or 'evaluate' on MS COCO", default='evaluate')
     parser.add_option('--dataset',
                         metavar="/path/to/coco/",
-                        help='Directory of the MS-COCO dataset', default='./val2014')
+                        help='Directory of the MS-COCO dataset', default="/home/user/Dataset/Jeju/fortraining_update") #/home/user/Dataset/Jeju")
     parser.add_option('--year',
                         default=DEFAULT_DATASET_YEAR,
                         metavar="<year>",
                         help='Year of the MS-COCO dataset (2014 or 2017) (default=2014)')
     parser.add_option('--model',
                         metavar="/path/to/weights.h5",
-                        help="Path to weights .h5 file or 'coco'", default = 'coco')
+                        help="Path to weights .h5 file or 'coco',imagenet", default ='last')
     parser.add_option('--logs',
-                        default=DEFAULT_LOGS_DIR,
+                        default=os.path.join(ROOT_DIR, "logs"),
                         metavar="/path/to/logs/",
                         help='Logs and checkpoints directory (default=logs/)')
     parser.add_option('--limit',
-                        default=500,
+                        default=200, #50,
                         metavar="<image count>",
                         help='Images to use for evaluation (default=500)')
     parser.add_option('--download',
@@ -443,6 +445,7 @@ if __name__ == '__main__':
     # Configurations
     if options.command == "train":
         config = CocoConfig()
+        test = 1
     else:
         class InferenceConfig(CocoConfig):
             # Set batch size to 1 since we'll be running inference on
@@ -484,12 +487,13 @@ if __name__ == '__main__':
         dataset_train = CocoDataset()
         dataset_train.load_coco(options.dataset, "train", year=options.year, auto_download=options.download)
         if options.year in '2014':
-            dataset_train.load_coco(options.dataset, "valminusminival", year=options.year, auto_download=options.download)
+            # dataset_train.load_coco(options.dataset, "valminusminival", year=options.year, auto_download=options.download)
+            dataset_train.load_coco(options.dataset, "train", year=options.year, auto_download=options.download)
         dataset_train.prepare()
 
         # Validation dataset
         dataset_val = CocoDataset()
-        val_type = "val" if options.year in '2017' else "minival"
+        val_type = "val" #if options.year in '2017' else "minival"
         dataset_val.load_coco(options.dataset, val_type, year=options.year, auto_download=options.download)
         dataset_val.prepare()
 
@@ -498,32 +502,34 @@ if __name__ == '__main__':
         augmentation = imgaug.augmenters.Fliplr(0.5)
 
         # *** This training schedule is an example. Update to your needs ***
-
+        # mean_average_precision_callback = modellib.MeanAveragePrecisionCallback(model,model,dataset_val,calculate_map_at_every_X_epoch=1,verbose=1)
         # Training - Stage 1
         print("Training network heads")
         model.train(dataset_train, dataset_val,
                     learning_rate=config.LEARNING_RATE,
-                    epochs=40,
+                    epochs=100, #40,
                     layers='heads',
                     augmentation=augmentation)
+        #
+        # # Training - Stage 2
+        # # Finetune layers from ResNet stage 4 and up
+        # print("Fine tune Resnet stage 4 and up")
+        # model.train(dataset_train, dataset_val,
+        #             learning_rate=config.LEARNING_RATE,
+        #             epochs=120,
+        #             layers='4+',
+        #             augmentation=augmentation)
 
-        # Training - Stage 2
-        # Finetune layers from ResNet stage 4 and up
-        print("Fine tune Resnet stage 4 and up")
-        model.train(dataset_train, dataset_val,
-                    learning_rate=config.LEARNING_RATE,
-                    epochs=120,
-                    layers='4+',
-                    augmentation=augmentation)
+        # # Training - Stage 3
+        # # Fine tune all layers
+        # print("Fine tune all layers")
+        # model.train(dataset_train, dataset_val,
+        #             learning_rate=config.LEARNING_RATE / 10,
+        #             epochs=161, #200, #160,
+        #             layers='all',
+        #             augmentation=augmentation)#,
+        #             #custom_callbacks=[mean_average_precision_callback])
 
-        # Training - Stage 3
-        # Fine tune all layers
-        print("Fine tune all layers")
-        model.train(dataset_train, dataset_val,
-                    learning_rate=config.LEARNING_RATE / 10,
-                    epochs=160,
-                    layers='all',
-                    augmentation=augmentation)
 
     elif options.command == "evaluate":
         # Validation dataset

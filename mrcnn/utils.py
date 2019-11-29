@@ -108,9 +108,8 @@ def compute_overlaps_masks(masks1, masks2):
     if masks1.shape[-1] == 0 or masks2.shape[-1] == 0:
         return np.zeros((masks1.shape[-1], masks2.shape[-1]))
     # flatten masks and compute their areas
-    # masks1 = np.reshape(masks1 > .5, (-1, masks1.shape[-1])).astype(np.float32)
-    # masks2 = np.reshape(masks2 > .5, (-1, masks2.shape[-1])).astype(np.float32
-    # masks1 = np.reshape(masks1 > .5, (-1, masks1.shape[-1])).astype(np.float32)
+    masks1 = np.reshape(masks1 > .5, (-1, masks1.shape[-1])).astype(np.float32)
+    masks2 = np.reshape(masks2 > .5, (-1, masks2.shape[-1])).astype(np.float32)
     area1 = np.sum(masks1, axis=0)
     area2 = np.sum(masks2, axis=0)
 
@@ -358,11 +357,14 @@ class Dataset(object):
     def load_image(self, image_id):
         """Load the specified image and return a [H,W,3] Numpy array.
         """
-        img_cv = cv2.imread(self.image_info[image_id]['path'])
-        _, orientation = IP.getExif(self.image_info[image_id]['path'])
-        image = IP.restoreOrientation(img_cv, orientation)
-        image = image[:, :, ::-1] # convert cv2 image to skimage
-
+        image = cv2.imread(self.image_info[image_id]['path'])
+        orientation = IP.getExif(self.image_info[image_id]['path'])
+        # print(orientation)
+        if orientation is not None:
+            image = IP.restoreOrientation(image, orientation)
+            image = image[:, :, ::-1] # convert cv2 image to skimage
+        # print("orientation",orientation)
+        # print("size:",image.shape)
         # Load image
         # image = skimage.io.imread(self.image_info[image_id]['path'])
 

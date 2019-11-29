@@ -1,20 +1,29 @@
 import cv2
 from PIL import Image
+import numpy as np
 from PIL.ExifTags import TAGS, GPSTAGS
 
 def getExif(path):
     src_image = Image.open(path)
     info = src_image._getexif()
+    test = 1
+    # if info is not None:
+    #     # Focal Length
+    #     # focalLength = info[37386]
+    #     # focal_length = focalLength[0] / focalLength[1] # unit: mm
+    #     # focal_length = focal_length * pow(10, -3) # unit: m
+    #
+    #     # Orientation
+    #     orientation = info[274]
+    # else:
+    #     orientation = None
+    try:
+        orientation = info[274]
+    except:
+        orientation = 0
 
-    # Focal Length
-    focalLength = info[37386]
-    focal_length = focalLength[0] / focalLength[1] # unit: mm
-    focal_length = focal_length * pow(10, -3) # unit: m
-
-    # Orientation
-    orientation = info[274]
-
-    return focal_length, orientation
+    # return focal_length, orientation
+    return orientation
 
 def restoreOrientation(image, orientation):
     if orientation == 8:
@@ -53,3 +62,48 @@ def rotate(image, angle):
     # perform the actual rotation and return the image
     rotated_mat = cv2.warpAffine(image, rotation_mat, (bound_w, bound_h))
     return rotated_mat
+
+def restoreVertices(bbox,ori): #dict = [x1_batch,y1_batch,x2_batch,y2_batch,class_batch]
+
+    X1_batch = []
+    Y1_batch = []
+    X2_batch = []
+    Y2_batch = []
+    degree ={6: 90, 3: 180}
+
+    cos = np.cos(degree[ori] * np.pi/180)
+    sin = np.sin(degree[ori] * np.pi/180)
+
+    for i in range(len(bbox[0])):
+        x1 = bbox[0][i]
+        y1 = bbox[1][i]
+        x3 = bbox[2][i]
+        y3 = bbox[3][i]
+
+        X1 = x1 * cos + y1 * sin
+        X3 = x3 * cos + y3 * sin
+        Y1 = -x1 * sin + y1 * cos
+        Y3 = -x3 * sin + y3 * cos
+        ## origin shift
+        X1 += abs(X3 - X1)
+        X3 += abs(X3 - X1)
+
+        if degree[ori] == 180:
+            Y1 += abs(Y3-Y1)
+            Y3 += abs(Y3-Y1)
+
+        X1_batch.append(int(X1))
+        X2_batch.append(int(X3))
+        Y1_batch.append(int(Y1))
+        Y2_batch.append(int(Y3))
+
+    return [X1_batch,Y1_batch,X2_batch,Y2_batch,bbox[4]]
+
+
+
+
+
+
+
+
+

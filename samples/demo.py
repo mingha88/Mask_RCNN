@@ -36,9 +36,10 @@ sys.path.append(os.path.join(ROOT_DIR, "samples/coco/"))  # To find local versio
 from samples.coco import coco_parse_opt as coco
 #%matplotlib inline
 import cv2
+import mrcnn.ImgPreprocess as IP
 from PIL import Image
 from PIL.ExifTags import TAGS, GPSTAGS
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 def getExif(path):
     src_image = Image.open(path)
@@ -93,13 +94,17 @@ def rotate(image, angle):
     return rotated_mat
 
 # Directory to save logs and trained model
-MODEL_DIR = "/home/user/Work/Mask_RCNN/samples/coco/logs"#os.path.join(ROOT_DIR, "logs")
+# MODEL_DIR = "/home/user/Work/Mask_RCNN/samples/coco/logs"#os.path.join(ROOT_DIR, "logs")
+# MODEL_DIR = "/home/user/Work/Mask_RCNN/weight_log/logs_5456x3632_1"#os.path.join(ROOT_DIR, "logs")
+# MODEL_DIR = "/home/user/Work/Mask_RCNN/weight_log/log_5456n1024_2"#os.path.join(ROOT_DIR, "logs")
 
-# MODEL_DIR = "/home/user/logs" #os.path.join(ROOT_DIR, "logs")
+# MODEL_DIR = "/home/user/Work/Mask_RCNN/weight_log/logs_5456x3632_2/42of120/coco20191120T0221"
+# MODEL_DIR = "/home/user/Work/Mask_RCNN/weight_log/logs_5456x3632_1/"
+# MODEL_DIR = "/home/user/Work/Mask_RCNN/weight_log/logs_5456x3632_2/onlyhead_100"
+
+MODEL_DIR = os.path.join(ROOT_DIR, "samples/coco/logs")
 # Local path to trained weights file
-# COCO_MODEL_PATH ="/home/user/Work/Mask_RCNN/samples/coco/logs/coco20191111T1858/mask_rcnn_coco_0078.h5" #ok
-# COCO_MODEL_PATH ="/home/user/Work/Mask_RCNN/samples/coco/logs/coco20191111T1858/mask_rcnn_coco_0083.h5"
-# #Checkpoint Path: /home/user/Work/Mask_RCNN/samples/coco/logs/coco20191105T1724/mask_rcnn_coco_{epoch:04d}.h5
+
 print(MODEL_DIR)
 # Download COCO trained weights from Releases if needed
 # if not os.path.exists(COCO_MODEL_PATH):
@@ -107,7 +112,12 @@ print(MODEL_DIR)
 
 # Directory of images to run detection on
 # IMAGE_DIR = os.path.join(ROOT_DIR, "images")
-IMAGE_DIR = "/home/user/Dataset/Jeju/annotated/"#os.path.join(ROOT_DIR, "images")
+IMAGE_DIR = "/home/user/NAS/mingha88/LDM/"#os.path.join(ROOT_DIR, "images")
+# IMAGE_DIR = "/home/user/Dataset/Jeju/3_kau_1011/Working/annotated/"#os.path.join(ROOT_DIR, "images")
+# IMAGE_DIR = "/home/user/Dataset/Jeju/1_kau_1010/annotated/1024/"#os.path.join(ROOT_DIR, "images")
+# IMAGE_DIR = "/home/user/Dataset/Visdrone/VisDrone2019-DET-val/images/"#os.path.join(ROOT_DIR, "images")
+# IMAGE_DIR = "/home/user/PPT/"
+# IMAGE_DIR = "/home/user/Dataset/Jeju/2_kau_1025/image/"#os.path.join(ROOT_DIR, "images")
 # IMAGE_DIR = "/home/user/crop"#os.path.join(ROOT_DIR, "images")
 
 """## Configurations
@@ -122,6 +132,7 @@ class InferenceConfig(coco.CocoConfig):
     # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
     GPU_COUNT = 1
     IMAGES_PER_GPU = 1
+    NUM_CLASSES = 6  # Visdrone (1+11)
 
 config = InferenceConfig()
 config.display()
@@ -130,7 +141,10 @@ config.display()
 
 # Create model object in inference mode.
 model = modellib.MaskRCNN(mode="inference", model_dir=MODEL_DIR, config=config)
-COCO_MODEL_PATH =model.find_last()
+# COCO_MODEL_PATH ="/home/user/Work/Mask_RCNN/weight_log/logs_5456x3632_1/mask_rcnn_coco_0160.h5"#model.find_last()
+# COCO_MODEL_PATH = "/home/user/Work/Mask_RCNN/weight_log/logs_5456x3632_2/42of120/coco20191120T0221/mask_rcnn_coco_0040.h5"#model.find_last()
+COCO_MODEL_PATH ="/home/user/Work/Mask_RCNN/samples/coco/logs/coco20191124T1733/mask_rcnn_coco_0194.h5" #model.find_last()
+# COCO_MODEL_PATH =model.find_last() #"/home/user/Work/Mask_RCNN/samples/coco/logs/coco20191111T1858/mask_rcnn_coco_0120.h5" #model.find_last()
 # Load weights trained on MS-COCO
 model.load_weights(COCO_MODEL_PATH, by_name=True)
 
@@ -157,48 +171,66 @@ We don't want to require you to download the COCO dataset just to run this demo,
 # COCO Class names
 # Index of the class in the list is its ID. For example, to get ID of
 # the teddy bear class, use: class_names.index('teddy bear')
-# class_names = ['BG', 'person', 'bicycle', 'car', 'motorcycle', 'airplane',
-#                'bus', 'train', 'truck', 'boat', 'traffic light',
-#                'fire hydrant', 'stop sign', 'parking meter', 'bench', 'bird',
-#                'cat', 'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear',
-#                'zebra', 'giraffe', 'backpack', 'umbrella', 'handbag', 'tie',
-#                'suitcase', 'frisbee', 'skis', 'snowboard', 'sports ball',
-#                'kite', 'baseball bat', 'baseball glove', 'skateboard',
-#                'surfboard', 'tennis racket', 'bottle', 'wine glass', 'cup',
-#                'fork', 'knife', 'spoon', 'bowl', 'banana', 'apple',
-#                'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza',
-#                'donut', 'cake', 'chair', 'couch', 'potted plant', 'bed',
-#                'dining table', 'toilet', 'tv', 'laptop', 'mouse', 'remote',
-#                'keyboard', 'cell phone', 'microwave', 'oven', 'toaster',
-#                'sink', 'refrigerator', 'book', 'clock', 'vase', 'scissors',
-#                'teddy bear', 'hair drier', 'toothbrush']
-class_names = ["0","1","2","3","4","5"]
 
+class_names = ["BG","Trash","Car","Building","Ocean","Land"]
+result = {'rois':0, 'masks':1, 'class_ids':2, 'scores':3}
+# class_names = ['BG','pedestrian','people','bicycle','car','van','truck', 'tricycle','awning-tricycle','bus','motor','others']
 """## Run Object Detection"""
-
+idx = 0
+# filenames = os.listdir(IMAGE_DIR)
+filenames = os.listdir(IMAGE_DIR)
+idx = 0
 # Load a random image from the images folder
-for i in range(10):
-    file_names = next(os.walk(IMAGE_DIR))[2]
-    # image = skimage.io.imread(os.path.join(IMAGE_DIR, random.choice(file_names)))
-    img_cv = cv2.imread(os.path.join(IMAGE_DIR,file_names[i]))
-    # image = rotate(image,90)
-    _,orientation = getExif(IMAGE_DIR+file_names[i])
-    image = restoreOrientation(img_cv,orientation)
-    image = image[:,:,::-1]
-    test = 1
-    # Run detection
-    results = model.detect([image],verbose=1)
+for file_names in filenames:
+    if ".jpg" in file_names.lower():
+        # print(file_names)
+        # next(os.walk(IMAGE_DIR))[2]
+        # image = skimage.io.imread(os.path.join(IMAGE_DIR, random.choice(file_names)))
+        # img_cv = cv2.imread(os.path.join(IMAGE_DIR,file_names[i]))
+        image = cv2.imread(os.path.join(IMAGE_DIR,file_names))
+        orientation = IP.getExif(IMAGE_DIR+file_names)
+        # if orientation is not None:
+        image = IP.restoreOrientation(image,orientation)
+        image = image[:,:,::-1]
 
-    # Visualize results
-    r = results[0]
-    visualize.display_instances(image, r['rois'], r['masks'], r['class_ids'],
-                                class_names, r['scores'])
-    # fig.savefig('demo.png', bbox_inches='tight')
+        # Run detection
+        results = model.detect([image],verbose=1)
 
-        # test = 1
+        # Visualize results
+        ob_idx = 0
+        target_rois=[]
+        target_masks=[]
+        target_class_ids=[]
+        target_scores=[]
+        flag = 0
+        r = results[0]
+        print("file name, detected!!",file_names,len(r['class_ids']))
+        test = 1
+        # for object_id in r['class_ids']:
+        #     if object_id == 1 or object_id == 2 or object_id == 3 : # ocean land   np.concatenate((np.array([[1,2,3]]),np.array([[4,5,6]])))
+        #         if flag == 0:
+        #             target_rois = np.array([r['rois'][ob_idx]])
+        #             target_masks = np.array([r['masks'][ob_idx]])
+        #             target_class_ids = np.array([r['class_ids'][ob_idx]])
+        #             target_scores = np.array([r['scores'][ob_idx]])
+        #             flag = 1
+        #         else:
+        #             target_rois = np.concatenate((target_rois,np.array([r['rois'][ob_idx]])))
+        #             target_masks = np.concatenate((target_masks,np.array([r['masks'][ob_idx]])))
+        #             target_class_ids = np.concatenate((target_class_ids,np.array([r['class_ids'][ob_idx]])))
+        #             target_scores = np.concatenate((target_scores,np.array([r['scores'][ob_idx]])))
+        #
+        #     ob_idx += 1
+        #
+        # visualize.display_instances(idx, image, target_rois, target_masks, target_class_ids, class_names,
+        #                             target_scores)  # np.delete(r['rois'],(1),axis=0) (1):row idx, axis=0
+        #visualize.display_instances(file_names, image, r['rois'], r['masks'], r['class_ids'], class_names, r['scores']) #np.delete(r['rois'],(1),axis=0) (1):row idx, axis=0
 
 
-# img_sk = skimage.io.imread(os.path.join(IMAGE_DIR,"20191010_104328.JPG"))
+        idx +=1
+
+    else: continue
+
 
 
 test = 1
